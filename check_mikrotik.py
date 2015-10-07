@@ -107,40 +107,45 @@ elif args.t == "wireless_signal":
 
 elif args.t == "temperature":
 	res = gather_info("/system/health/print")
-	temp = float(res[0][1]['temperature'])
-	if temp >= args.c: 
-		exit = exits[2]
-		message += "CRITICAL: System temperature is " + str(temp) + "deg - above critical threshold of " + str(args.c)
-	elif temp >= args.w: 
-		exit = exits[1]
-		message += "WARNING: System temperature is " + str(temp) + "deg - above warning threshold of " + str(args.w) 
+	if 'temperature' not in res[0][1].keys():
+		print "Temperature monitoring not supported on this routerboard"
+		exit = exits[3]
 	else: 
-		exit = exits[0]
-		message += "System temperature is OK - " + str(temp) + "deg"
-	perfdata += "'System Temp'=" + str(temp)
-	
-	print message + perfdata
-	exit = exits[0]
+		temp = float(res[0][1]['temperature'])
+		if temp >= args.c: 
+			exit = exits[2]
+			message += "CRITICAL: System temperature is " + str(temp) + "deg - above critical threshold of " + str(args.c)
+		elif temp >= args.w: 
+			exit = exits[1]
+			message += "WARNING: System temperature is " + str(temp) + "deg - above warning threshold of " + str(args.w) 
+		else: 
+			exit = exits[0]
+			message += "System temperature is OK - " + str(temp) + "deg"
+		
+		perfdata += "'System Temp'=" + str(temp)
+		print message + perfdata
+
 
 elif args.t == "voltage" and args.n:
 	res = gather_info("/system/health/print")
-	volts = float(res[0][1]['voltage'])
-
-	if (args.n - args.w) <= volts <= (args.n + args.w): 
-		message = "OK: Supply voltage is " + str(volts) + "V - within warning range of " + str(args.n -  args.w) + " and " + str(args.n + args.w) 
-		exit = exits[0]
-	elif (args.n - args.c) <= volts <= (args.n + args.c): 
-		message = "WARNING: Supply voltage is " + str(volts) + "V - outside warning range " + str(args.n -  args.w) + " and " + str(args.n + args.w) 
-		exit = exits[1]
+	if 'voltage' not in res[0][1].keys():
+		print "Voltage monitoring not supported on this routerboard"
+		exit = exits[3]
 	else: 
-		message = "CRITICAL: Supply voltage is " + str(volts) + "V - outside critical range " + str(args.n -  args.c) + " and " + str(args.n + args.c) 
-		exit = exits[2]
+		volts = float(res[0][1]['voltage'])
 
+		if (args.n - args.w) <= volts <= (args.n + args.w): 
+			message = "OK: Supply voltage is " + str(volts) + "V - within warning range of " + str(args.n -  args.w) + " and " + str(args.n + args.w) 
+			exit = exits[0]
+		elif (args.n - args.c) <= volts <= (args.n + args.c): 
+			message = "WARNING: Supply voltage is " + str(volts) + "V - outside warning range " + str(args.n -  args.w) + " and " + str(args.n + args.w) 
+			exit = exits[1]
+		else: 
+			message = "CRITICAL: Supply voltage is " + str(volts) + "V - outside critical range " + str(args.n -  args.c) + " and " + str(args.n + args.c) 
+			exit = exits[2]
 
-	perfdata += "'System Voltage'=" + str(volts)
-	
-	print message + perfdata
-	exit = exits[0]
+		perfdata += "'System Voltage'=" + str(volts)
+		print message + perfdata
 
 else:
 	print "UNKNOWN: - please specify -t and all sub options, ie: -n"
