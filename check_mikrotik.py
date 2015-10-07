@@ -9,19 +9,25 @@ import rosapi
 
 logging.basicConfig(level=logging.INFO)
 
-exits = [{"text": "Ok", "code": 0}, {"text": "Warning", "code": 1}, {"text": "Critical", "code": 2}, {"text": "Unknown", "code": 3}]
+exits = [{"text": "Ok", "code": 0}, {"text": "args.w", "code": 1}, {"text": "Critical", "code": 2}, {"text": "Unknown", "code": 3}]
 exit = exits[3]
 
 parser = argparse.ArgumentParser(description='Check for monitoring Mikrotik Routerboards')
-parser.add_argument('-H', help='Host address')
-parser.add_argument('-p', help='ROS API Port', default=8728)
-parser.add_argument('-t', help='Check type',default="resources")
-parser.add_argument('-U', help='Username', default="admin")
-parser.add_argument('-P', help='Password', default="")
+parser.add_argument('-H', help='mikrotik router address')
+parser.add_argument('-p', help='routeros api port', default=8728)
+parser.add_argument('-t', help='check type',default="resources")
+parser.add_argument('-U', help='username', default="admin")
+parser.add_argument('-P', help='password', default="")
+parser.add_argument('-w', help='warning threshold', type=float, default=80)
+parser.add_argument('-c', help='critical threshold', type=float, default=95)
+parser.add_argument('-n', help='nominal value', type=float)
 args = parser.parse_args()
 
-critical = 90
-warning = 80
+
+values = {}
+message = ""
+perfdata = " | "
+
 
 def gather_info(command):
 
@@ -35,8 +41,6 @@ def gather_info(command):
 if args.t == "resources": 
 
 	res = gather_info("/system/resource/print")[0][1]
-
-	values = {}
 
 	# Calculate memory
 	total = float(res['total-memory'])
@@ -54,25 +58,21 @@ if args.t == "resources":
 	values['CPU Load'] = float(res['cpu-load'])
 
 	info = "Routerboard " + res['board-name'] + " (" + res['architecture-name'] + ") RouterOS " + res['version']  + ", Uptime: " + res['uptime'] 
-	message = ""
-	perfdata = " | "
 	for metric in values:
 
-		if values[metric] >= critical: 
+		if values[metric] >= args.c: 
 			exit = exits[2]
-			message += metric + "is " + str(values[metric]) + " - above critical threshold of " + str(critical) +"% "
-		elif values[metric] >= warning: 
+			message += metric + " is " + str(values[metric]) + " - above critical threshold of " + str(args.c) +"% "
+		elif values[metric] >= args.w: 
 			exit = exits[1]
-			message += metric + "is " + str(values[metric]) + " - above critical threshold of " + str(warning) + "% " 
+			message += metric + " is " + str(values[metric]) + " - above warning threshold of " + str(args.w) + "% " 
 		else: 
 			exit = exits[0]
 			message += metric + " is OK (" + str(values[metric]) + "%) "
-		perfdata += "'" + metric + "'" + "=" + str(values[metric]) + "%;" + str(warning) + ";" + str(critical) + ";; " 
+		perfdata += "'" + metric + "'" + "=" + str(values[metric]) + "%;" + str(args.w) + ";" + str(args.c) + ";; " 
 	print(exit["text"] + ": " + message  + info + perfdata)
 
 elif args.t == "wireless_signal":
-	message = ""
-	perfdata = " | "
 	res = gather_info("/interface/wireless/registration-table/print")
 	del res[-1] #remove !done last element 
 	client = dict()
@@ -94,15 +94,55 @@ elif args.t == "wireless_signal":
 			client[reg[1]["mac-address"]]["TX Rate"] = reg[1]["tx-rate"]
 	
 	message = "Found " + str(len(client)) + " wireless clients\n"
-
+	perfdata += " | 'Wireless Clients'=" + str(len(client)) + " "
 	for c in client: 
 		message += "Wireless client: " + c + " - "
 		for metric in client[c]: 
 			message += metric + ": " + str(client[c][metric]) + "; "
 			if type(client[c][metric]) == int: 
-				perfdata += "'" + c + " " + metric + "'=" + str(abs(client[c][metric])) + ";" + str(warning) + ";" + str(critical) + ";; "
+				perfdata += "'" + c + " " + metric + "'=" + str(abs(client[c][metric])) + ";" + str(args.w) + ";" + str(args.c) + ";; "
 		message += "\n"
 	print message + perfdata
 	exit = exits[0]
+
+elif args.t == "temperature":
+	res = gather_info("/system/health/print")
+	temp = float(res[0][1]['temperature'])
+	if temp >= args.c: 
+		exit = exits[2]
+		message += "CRITICAL: System temperature is " + str(temp) + "deg - above critical threshold of " + str(args.c)
+	elif temp >= args.w: 
+		exit = exits[1]
+		message += "WARNING: System temperature is " + str(temp) + "deg - above warning threshold of " + str(args.w) 
+	else: 
+		exit = exits[0]
+		message += "System temperature is OK - " + str(temp) + "deg"
+	perfdata += "'System Temp'=" + str(temp)
+	
+	print message + perfdata
+	exit = exits[0]
+
+elif args.t == "voltage" and args.n:
+	res = gather_info("/system/health/print")
+	volts = float(res[0][1]['voltage'])
+
+	if (args.n - args.w) <= volts <= (args.n + args.w): 
+		message = "OK: Supply voltage is " + str(volts) + "V - within warning range of " + str(args.n -  args.w) + " and " + str(args.n + args.w) 
+		exit = exits[0]
+	elif (args.n - args.c) <= volts <= (args.n + args.c): 
+		message = "WARNING: Supply voltage is " + str(volts) + "V - outside warning range " + str(args.n -  args.w) + " and " + str(args.n + args.w) 
+		exit = exits[1]
+	else: 
+		message = "CRITICAL: Supply voltage is " + str(volts) + "V - outside critical range " + str(args.n -  args.c) + " and " + str(args.n + args.c) 
+		exit = exits[2]
+
+
+	perfdata += "'System Voltage'=" + str(volts)
+	
+	print message + perfdata
+	exit = exits[0]
+
+else:
+	print "UNKNOWN: - please specify -t and all sub options, ie: -n"
 
 sys.exit(exit["code"])
