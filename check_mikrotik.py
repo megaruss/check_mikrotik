@@ -60,10 +60,10 @@ if args.t == "resources":
 
 		if values[metric] >= critical: 
 			exit = exits[2]
-			message += metric + " above critical threshold of " + str(critical) +"% "
+			message += metric + "is " + str(values[metric]) + " - above critical threshold of " + str(critical) +"% "
 		elif values[metric] >= warning: 
 			exit = exits[1]
-			message += metric + " above critical threshold of " + str(warning) + "% " 
+			message += metric + "is " + str(values[metric]) + " - above critical threshold of " + str(warning) + "% " 
 		else: 
 			exit = exits[0]
 			message += metric + " is OK (" + str(values[metric]) + "%) "
@@ -100,7 +100,7 @@ elif args.t == "wireless_signal":
 		for metric in client[c]: 
 			message += metric + ": " + str(client[c][metric]) + "; "
 			if type(client[c][metric]) == int: 
-				perfdata += "'" + metric + "'=" + str(abs(client[c][metric])) + ";" + str(warning) + ";" + str(critical) + ";; "
+				perfdata += "'" + c + " " + metric + "'=" + str(abs(client[c][metric])) + ";" + str(warning) + ";" + str(critical) + ";; "
 		message += "\n"
 	print message + perfdata
 	exit = exits[0]
