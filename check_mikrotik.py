@@ -72,7 +72,7 @@ if args.t == "resources":
 
 elif args.t == "wireless_signal":
 	message = ""
-	perfdata = ""
+	perfdata = " | "
 	res = gather_info("/interface/wireless/registration-table/print")
 	del res[-1] #remove !done last element 
 	client = dict()
